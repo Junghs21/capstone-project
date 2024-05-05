@@ -1,7 +1,7 @@
-package jhs.capstone.cookie;
+package jhs.capstone.session;
 
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jhs.capstone.dto.JoinRequest;
 import jhs.capstone.dto.LoginRequest;
@@ -17,21 +17,20 @@ import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/cookie-login")
-public class CookieLoginController {
+@RequestMapping("/session-login")
+public class SessionLoginController {
 
     private final UserService userService;
 
     @GetMapping(value = {"", "/"})
-    public String home(@CookieValue(name = "userId", required = false) Long userId, Model model){
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+    public String home(Model model, @SessionAttribute(name = "userId", required = false) Long userId) {
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         User loginUser = userService.getLoginUserById(userId);
 
-        if(loginUser != null){
+        if(loginUser != null) {
             model.addAttribute("nickname", loginUser.getNickname());
-            loginUser.getNickname();
         }
 
         return "home";
@@ -39,8 +38,8 @@ public class CookieLoginController {
 
     @GetMapping("/join")
     public String joinPage(Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         model.addAttribute("joinRequest", new JoinRequest());
         return "join";
@@ -48,8 +47,8 @@ public class CookieLoginController {
 
     @PostMapping("/join")
     public String join(@Valid @ModelAttribute JoinRequest joinRequest, BindingResult bindingResult, Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         // loginId 중복 체크
         if(userService.checkLoginIdDuplicate(joinRequest.getLoginId())) {
@@ -69,13 +68,13 @@ public class CookieLoginController {
         }
 
         userService.join(joinRequest);
-        return "redirect:/cookie-login";
+        return "redirect:/session-login";
     }
 
     @GetMapping("/login")
     public String loginPage(Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         model.addAttribute("loginRequest", new LoginRequest());
         return "login";
@@ -83,9 +82,9 @@ public class CookieLoginController {
 
     @PostMapping("/login")
     public String login(@ModelAttribute LoginRequest loginRequest, BindingResult bindingResult,
-                        HttpServletResponse response, Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+                        HttpServletRequest httpServletRequest, Model model) {
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         User user = userService.login(loginRequest);
 
@@ -98,34 +97,39 @@ public class CookieLoginController {
             return "login";
         }
 
-        // 로그인 성공 => 쿠키 생성
-        Cookie cookie = new Cookie("userId", String.valueOf(user.getId()));
-        cookie.setMaxAge(60 * 60);  // 쿠키 유효 시간 : 1시간
-        response.addCookie(cookie);
+        // 로그인 성공 => 세션 생성
 
-        return "redirect:/cookie-login";
+        // 세션을 생성하기 전에 기존의 세션 파기
+        httpServletRequest.getSession().invalidate();
+        HttpSession session = httpServletRequest.getSession(true);  // Session이 없으면 생성
+        // 세션에 userId를 넣어줌
+        session.setAttribute("userId", user.getId());
+        session.setMaxInactiveInterval(1800); // Session이 30분동안 유지
+
+        return "redirect:/session-login";
     }
 
     @GetMapping("/logout")
-    public String logout(HttpServletResponse response, Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+    public String logout(HttpServletRequest request, Model model) {
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
-        Cookie cookie = new Cookie("userId", null);
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
-        return "redirect:/cookie-login";
+        HttpSession session = request.getSession(false);  // Session이 없으면 null return
+        if(session != null) {
+            session.invalidate();
+        }
+        return "redirect:/session-login";
     }
 
     @GetMapping("/info")
-    public String userInfo(@CookieValue(name = "userId", required = false) Long userId, Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+    public String userInfo(@SessionAttribute(name = "userId", required = false) Long userId, Model model) {
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         User loginUser = userService.getLoginUserById(userId);
 
         if(loginUser == null) {
-            return "redirect:/cookie-login/login";
+            return "redirect:/session-login/login";
         }
 
         model.addAttribute("user", loginUser);
@@ -133,18 +137,18 @@ public class CookieLoginController {
     }
 
     @GetMapping("/admin")
-    public String adminPage(@CookieValue(name = "userId", required = false) Long userId, Model model) {
-        model.addAttribute("loginType", "cookie-login");
-        model.addAttribute("pageName", "쿠키 로그인");
+    public String adminPage(@SessionAttribute(name = "userId", required = false) Long userId, Model model) {
+        model.addAttribute("loginType", "session-login");
+        model.addAttribute("pageName", "세션 로그인");
 
         User loginUser = userService.getLoginUserById(userId);
 
         if(loginUser == null) {
-            return "redirect:/cookie-login/login";
+            return "redirect:/session-login/login";
         }
 
         if(!loginUser.getRole().equals(UserRole.ADMIN)) {
-            return "redirect:/cookie-login";
+            return "redirect:/session-login";
         }
 
         return "admin";
