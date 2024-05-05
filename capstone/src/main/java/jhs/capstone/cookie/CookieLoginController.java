@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping
+@RequestMapping("/cookie-login")
 public class CookieLoginController {
 
     private final UserService userService;
